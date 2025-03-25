@@ -1,48 +1,63 @@
 import "./App.css";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Movies } from "./components/Movies.jsx";
 import { useMovies } from "./hooks/useMovie.js";
-import { useRef } from "react";
+import debounce from "just-debounce-it";
 
-function useSearch () {
+function useSearch() {
   const [search, updateSearch] = useState("");
   const [error, setError] = useState(null);
   const isFirstInput = useRef(true);
-  
-    useEffect(() => {
-      if (isFirstInput.current) {
-        isFirstInput.current = search === "";
-        return;
-      }
 
-      if (search == "") {
-        setError("can't serach empty string");
-        return;
-      }
-  
-      if (search.length < 3) {
-        setError("search must be at least 3 characters long");
-        return;
-      }
-  
-      setError(null);
-    }, [search]);
+  useEffect(() => {
+    if (isFirstInput.current) {
+      isFirstInput.current = search === "";
+      return;
+    }
 
-    return { search, updateSearch, error };
+    if (search == "") {
+      setError("can't serach empty string");
+      return;
+    }
+
+    if (search.length < 3) {
+      setError("search must be at least 3 characters long");
+      return;
+    }
+
+    setError(null);
+  }, [search]);
+
+  return { search, updateSearch, error };
 }
 
-
 function App() {
-  const { movies } = useMovies();
+  const [sort, setSort] = useState(false);
   const { search, updateSearch, error } = useSearch();
+  const { movies, loading, getMovies } = useMovies({ search, sort });
+
+  const debouncedGetMovies = useCallback(
+    debounce((search) => {
+      console.log("searching", search);
+      getMovies({ search });
+    }, 500),
+    [getMovies]
+  );
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    console.log({ search });
+    getMovies({ search });
+  };
+
+  const handleSort = () => {
+    setSort(!sort);
   };
 
   const handleChange = (event) => {
-    updateSearch(event.target.value);
+    const newSearch = event.target.value;
+    updateSearch(newSearch);
+    getMovies({ search: newSearch });
+    debouncedGetMovies(newSearch);
   };
 
   return (
@@ -59,14 +74,13 @@ function App() {
             value={search}
             placeholder="Avengers, Star Wars, The Matrix..."
           />
+          <input type="checkbox" onChange={handleSort} checked={sort} />
           <button type="submit">Search</button>
         </form>
         {error && <p style={{ color: "red" }}>{error}</p>}
       </header>
 
-      <main>
-        <Movies movies={movies} />
-      </main>
+      <main>{loading ? <p>Loading...</p> : <Movies movies={movies} />}</main>
     </div>
   );
 }
